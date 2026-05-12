@@ -19,6 +19,7 @@
 
 #include <stTestCore/func_tester.h>
 #include <stTestCore/adapter.h>
+#include <stTestCore/dump.h>
 #include <patternUtil/test_pattern.h>
 #include <metricUtil/cd_measure_util.cuh>
 
@@ -28,6 +29,7 @@
 #include <string>
 #include <algorithm>
 #include <numeric>
+#include <sys/stat.h>
 
 using namespace st::util;
 
@@ -171,6 +173,17 @@ static void upload_patterns(float* d_E,
     cudaStreamSynchronize(stream);
 }
 
+// ── Dump helpers ─────────────────────────────────────────────────────────────
+static void mkdir_p(const std::string& p) {
+    for(size_t i=1;i<=p.size();++i)
+        if(i==p.size()||p[i]=='/')  mkdir(p.substr(0,i).c_str(),0755);
+}
+static void dump_image(const std::string& path, float* d_ptr, int W,
+                       const std::string& name) {
+    dump_buffer(path, d_ptr, MemSpace::DEVICE,
+                DType::FLOAT32, Dims::make_2d(W, W), name);
+}
+
 // ── CD sweep helper ──────────────────────────────────────────────────────────
 struct CDSweepResult {
     float mean_err=0.f, max_err=0.f, rms_err=0.f;
@@ -189,7 +202,9 @@ static CDSweepResult run_cd_sweep(
     float coeff_c,                 // shrinkage coefficient
     bool center_row,               // true=extract row, false=extract col
     const char* label,
-    cudaStream_t stream)
+    cudaStream_t stream,
+    const std::string& dump_dir,
+    int dump_max)
 {
     // Crop center W×W from E (shared for both ref and test).
     { dim3 blk(16,16), grd((W+15)/16,(W+15)/16,B);
@@ -198,17 +213,43 @@ static CDSweepResult run_cd_sweep(
     op_ref (d_E, d_R_ref_out);
     op_test(d_E, d_R_test_out);
 
-    // shrinkage: signal = E_crop + coeff * R
+    // shrinkage ref: signal = E_crop + coeff * R_ref
     { dim3 blk(16,16), grd((W+15)/16,(W+15)/16,B);
       apply_shrinkage<<<grd,blk,0,stream>>>(d_E_crop, d_R_ref_out,  d_shrink, coeff_c, W);
       cudaStreamSynchronize(stream); }
+
+    // dump E_crop and shrink_ref for first dump_max batches
+    if (!dump_dir.empty()) {
+        mkdir_p(dump_dir);
+        const int nd = std::min(dump_max, B);
+        for (int b=0; b<nd; ++b) {
+            char buf[256];
+            snprintf(buf,sizeof(buf),"%s/b%d_E.txt",      dump_dir.c_str(), b);
+            dump_image(buf, d_E_crop + (size_t)b*W*W, W, "E_crop");
+            snprintf(buf,sizeof(buf),"%s/b%d_shrink_ref.txt", dump_dir.c_str(), b);
+            dump_image(buf, d_shrink  + (size_t)b*W*W, W, "shrink_ref");
+        }
+    }
+
     { dim3 blk1(128), grd1((W+127)/128,B);
       if (center_row) extract_center_row<<<grd1,blk1,0,stream>>>(d_shrink, d_sig_ref, W);
       else            extract_center_col<<<grd1,blk1,0,stream>>>(d_shrink, d_sig_ref, W); }
 
+    // shrinkage test: signal = E_crop + coeff * R_test
     { dim3 blk(16,16), grd((W+15)/16,(W+15)/16,B);
       apply_shrinkage<<<grd,blk,0,stream>>>(d_E_crop, d_R_test_out, d_shrink, coeff_c, W);
       cudaStreamSynchronize(stream); }
+
+    // dump shrink_test for first dump_max batches
+    if (!dump_dir.empty()) {
+        const int nd = std::min(dump_max, B);
+        for (int b=0; b<nd; ++b) {
+            char buf[256];
+            snprintf(buf,sizeof(buf),"%s/b%d_shrink_test.txt", dump_dir.c_str(), b);
+            dump_image(buf, d_shrink + (size_t)b*W*W, W, "shrink_test");
+        }
+    }
+
     { dim3 blk1(128), grd1((W+127)/128,B);
       if (center_row) extract_center_row<<<grd1,blk1,0,stream>>>(d_shrink, d_sig_test, W);
       else            extract_center_col<<<grd1,blk1,0,stream>>>(d_shrink, d_sig_test, W); }
@@ -352,6 +393,8 @@ int main(int argc, char** argv)
         return imgs;
     };
 
+    const int DUMP_MAX = get_arg_int(argc, argv, "--dump_max", 4);
+
     // Section B: LNS_VERTICAL → measure horizontal CD (center row).
     {
         auto imgs = make_lns_patterns(/*vertical=*/true);
@@ -359,7 +402,8 @@ int main(int argc, char** argv)
         run_cd_sweep(d_E, g_ctx.d_R_ref, g_ctx.d_R_test,
                      d_E_crop, d_shrink, d_sig_ref, d_sig_test,
                      B, N, W, EROSION, COEFF_C, /*center_row=*/true,
-                     "LNS_VERTICAL — center-row CD  [signal = E + c·R]", stream);
+                     "LNS_VERTICAL — center-row CD  [signal = E + c·R]",
+                     stream, "dump_cd/lns_vert", DUMP_MAX);
     }
 
     // Section C: LNS_HORIZONTAL → measure vertical CD (center column).
@@ -369,7 +413,8 @@ int main(int argc, char** argv)
         run_cd_sweep(d_E, g_ctx.d_R_ref, g_ctx.d_R_test,
                      d_E_crop, d_shrink, d_sig_ref, d_sig_test,
                      B, N, W, EROSION, COEFF_C, /*center_row=*/false,
-                     "LNS_HORIZONTAL — center-col CD  [signal = E + c·R]", stream);
+                     "LNS_HORIZONTAL — center-col CD  [signal = E + c·R]",
+                     stream, "dump_cd/lns_horiz", DUMP_MAX);
     }
 
     // ── Cleanup ───────────────────────────────────────────────────────────

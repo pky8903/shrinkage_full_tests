@@ -2,5 +2,6 @@ build/
 dump/
 dump_batch/
 dump_compare/
+dump_cd/
 .claude/
 .codex/

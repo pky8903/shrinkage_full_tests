@@ -2,12 +2,12 @@
 
 The table below lists the functions a developer must accelerate, the parameter ranges of interest, and the associated test binary.
 
-| Function | Image size (N×N) | Filter width KW = 2·erosion+1 | Batch B | Test binary |
-|---|---|---|---|---|
-| `srkTrainingForward` | 256, 512 | 31 – 121 | 1 000 – 5 000 | `compare_demo`, `cd_training_test` |
-| `adjointSRK` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_adjoint_test` |
-| `shrinkageTangentOaS` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_tan_tanadj_test` |
-| `shrinkageTangentAdjointOaS` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_tan_tanadj_test` |
+| Function | Image size (N×N) | Filter width KW = 2·erosion+1 | Batch B | Test binary | Pass criteria |
+|---|---|---|---|---|---|
+| `srkTrainingForward` | 256, 512 | 31 – 121 | 1 000 – 5 000 | `compare_demo`, `cd_training_test` | max CD diff < 0.01 px · speedup ≥ 2× · peak mem unchanged |
+| `adjointSRK` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_adjoint_test` | fp32: tol_rel ≤ 1e-03, tol_abs ≤ 1e-05; fp16: tol_rel ≤ 1e-02, tol_abs ≤ 1e-03 (ε unchanged) · speedup ≥ 2× · peak mem unchanged |
+| `shrinkageTangentOaS` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_tan_tanadj_test` | fp32: tol_rel ≤ 1e-03, tol_abs ≤ 1e-05; fp16: tol_rel ≤ 1e-02, tol_abs ≤ 1e-03 (ε unchanged) · speedup ≥ 2× · peak mem unchanged |
+| `shrinkageTangentAdjointOaS` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_tan_tanadj_test` | fp32: tol_rel ≤ 1e-03, tol_abs ≤ 1e-05; fp16: tol_rel ≤ 1e-02, tol_abs ≤ 1e-03 (ε unchanged) · speedup ≥ 2× · peak mem unchanged |
 
 **Derived parameters** (given KW):
 - `erosion = (KW − 1) / 2`  (e.g. KW=121 → erosion=60)
@@ -26,14 +26,14 @@ The table below lists the functions a developer must accelerate, the parameter r
 3. Rebuild and run:
    ```bash
    bash build.sh
-   ./build/cd_training_test --sigma 20.0 --N 256 --B 30 --coeff_c 0.1
+   bash run_cd_training_test.sh
    ```
 4. The binary runs three sections:
    - **Section A** — Pixel-level accuracy vs reference (GP random inputs, 10 iterations).
    - **Section B** — CD sweep on LNS vertical patterns; measures `CD(E + c·R)`.
    - **Section C** — CD sweep on LNS horizontal patterns; measures `CD(E + c·R)`.
 
-   A correct accelerated implementation should produce `max|diff| = 0` in Sections A–C (float32 bit-exact) or sub-0.001 px CD error if the implementation uses a different but equivalent algorithm.
+   **Pass**: Section A `max|diff| = 0` (float32 bit-exact); Sections B/C `max CD diff < 0.01 px`; speedup ≥ 2× (latency block in Section A); peak GPU memory unchanged.
 
 ---
 
@@ -108,3 +108,4 @@ All spatial 2D buffers use **col-major layout** (`buf[col*H + row]`), consistent
 - `plot_tan_tanadj.ipynb` — visualise tangent / tangent-adjoint dumps
 - `plot_batch_demo.ipynb` — visualise batch demo outputs
 - `plot_compare_demo.ipynb` — signal + performance comparison: FFT vs Strip cuDNN
+- `plot_cd_training.ipynb` — visualise `dump_cd/` images (E, E+c·R ref, E+c·R test, diff)
