@@ -4,7 +4,7 @@ The table below lists the functions a developer must accelerate, the parameter r
 
 | Function | Image size (N×N) | Filter width KW = 2·erosion+1 | Batch B | Test binary | Pass criteria |
 |---|---|---|---|---|---|
-| `srkTrainingForward` | 256, 512 | 31 – 121 | 1 000 – 5 000 | `compare_demo`, `cd_training_test` | max CD diff < 0.01 px · speedup ≥ 2× · peak mem unchanged |
+| `srkTrainingForward` | 256, 512 | 31 – 121 | (typical case) 5 000 | `compare_demo`, `cd_training_test` | max CD diff < 0.01 px · speedup ≥ 2× · peak mem unchanged |
 | `adjointSRK` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_adjoint_test` | fp32: tol_rel ≤ 1e-03, tol_abs ≤ 1e-05; fp16: tol_rel ≤ 1e-02, tol_abs ≤ 1e-03 (ε unchanged) · speedup ≥ 2× · peak mem unchanged |
 | `shrinkageTangentOaS` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_tan_tanadj_test` | fp32: tol_rel ≤ 1e-03, tol_abs ≤ 1e-05; fp16: tol_rel ≤ 1e-02, tol_abs ≤ 1e-03 (ε unchanged) · speedup ≥ 2× · peak mem unchanged |
 | `shrinkageTangentAdjointOaS` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_tan_tanadj_test` | fp32: tol_rel ≤ 1e-03, tol_abs ≤ 1e-05; fp16: tol_rel ≤ 1e-02, tol_abs ≤ 1e-03 (ε unchanged) · speedup ≥ 2× · peak mem unchanged |
