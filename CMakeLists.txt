@@ -15,8 +15,11 @@ set(CUTLASS_DIR  "/home/kyp/Workspace/01.libraries/cutlass"
 
 find_package(CUDAToolkit REQUIRED)
 
-# ── Shared sources (patternUtil.cu compiled once per target via OBJECT lib) ──
+# ── Shared sources ────────────────────────────────────────────────────────────
 set(SHRINKAGE_PATTERN_SRC third_party/src/patternUtil/test_pattern.cu)
+set(SHRINKAGE_CD_SRC
+    third_party/src/patternUtil/test_pattern.cu
+    third_party/src/metricUtil/cd_measure_util.cu)
 
 # ── Executable definitions ─────────────────────────────────────────────────
 #   shrinkage_adjoint_test           : adjoint/main_adjoint.cu
@@ -24,18 +27,21 @@ set(SHRINKAGE_PATTERN_SRC third_party/src/patternUtil/test_pattern.cu)
 #   shrinkage_forward_training_test  : training/main_forward_training.cu  (needs cuDNN)
 #   batch_demo                       : training/main_batch_demo.cu         (needs cuDNN)
 #   compare_demo                     : training/main_compare.cu            (needs cuDNN)
+#   cd_training_test                 : training/main_cd_training.cu        (needs cuDNN)
 add_executable(shrinkage_adjoint_test          adjoint/main_adjoint.cu           ${SHRINKAGE_PATTERN_SRC})
 add_executable(shrinkage_tan_tanadj_test       tan_tanadj/main_tan_tanadj.cu     ${SHRINKAGE_PATTERN_SRC})
 add_executable(shrinkage_forward_training_test training/main_forward_training.cu ${SHRINKAGE_PATTERN_SRC})
 add_executable(batch_demo                      training/main_batch_demo.cu       ${SHRINKAGE_PATTERN_SRC})
 add_executable(compare_demo                    training/main_compare.cu          ${SHRINKAGE_PATTERN_SRC})
+add_executable(cd_training_test                training/main_cd_training.cu      ${SHRINKAGE_CD_SRC})
 
 set(SHRINKAGE_TARGETS
     shrinkage_adjoint_test
     shrinkage_tan_tanadj_test
     shrinkage_forward_training_test
     batch_demo
-    compare_demo)
+    compare_demo
+    cd_training_test)
 
 foreach(_tgt ${SHRINKAGE_TARGETS})
     target_include_directories(${_tgt} PRIVATE
@@ -73,7 +79,8 @@ foreach(_tgt ${SHRINKAGE_TARGETS})
     )
 endforeach()
 
-# cuDNN required only by the training/batch-demo/compare targets.
+# cuDNN required only by the training/batch-demo/compare/cd targets.
 target_link_libraries(shrinkage_forward_training_test PRIVATE cudnn)
 target_link_libraries(batch_demo                      PRIVATE cudnn)
 target_link_libraries(compare_demo                    PRIVATE cudnn)
+target_link_libraries(cd_training_test                PRIVATE cudnn)
