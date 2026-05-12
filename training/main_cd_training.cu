@@ -33,7 +33,7 @@
 
 using namespace st::util;
 
-static constexpr float DX        = 1.0f;
+static constexpr float DX_PX     = 1.0f;  // pixel spacing in pixel coords (kernel internal)
 static constexpr float SRSRK_C_W = 3.0f;
 
 // ── Kernel generation ────────────────────────────────────────────────────────
@@ -200,6 +200,7 @@ static CDSweepResult run_cd_sweep(
     float* d_sig_test,             // [B×W] scratch
     int B, int N, int W, int erosion,
     float coeff_c,                 // shrinkage coefficient
+    float dx_nm,                   // physical pixel pitch [nm] for unit conversion
     bool center_row,               // true=extract row, false=extract col
     const char* label,
     cudaStream_t stream,
@@ -261,14 +262,16 @@ static CDSweepResult run_cd_sweep(
 
     CDSweepResult res; res.n=B;
     printf("\n  %s\n", label);
-    printf("  %-4s  %10s  %10s  %10s\n","pat","CD_ref","CD_test","|diff|");
+    printf("  %-4s  %12s  %12s  %12s\n","pat","CD_ref[nm]","CD_test[nm]","|diff|[nm]");
     for (int b=0; b<B; ++b) {
-        float r=cd_ref.cd[b].cd_px, t=cd_test.cd[b].cd_px, d=std::fabs(r-t);
+        float r=cd_ref.cd[b].cd_px * dx_nm;
+        float t=cd_test.cd[b].cd_px * dx_nm;
+        float d=std::fabs(r-t);
         res.mean_err += d; res.max_err = std::max(res.max_err,d); res.rms_err += d*d;
-        printf("  %-4d  %10.4f  %10.4f  %10.4f\n", b, r, t, d);
+        printf("  %-4d  %12.4f  %12.4f  %12.4f\n", b, r, t, d);
     }
     res.mean_err /= B; res.rms_err = std::sqrt(res.rms_err/B);
-    printf("  mean|diff|=%.4f  max|diff|=%.4f  rms|diff|=%.4f  [px]\n",
+    printf("  mean|diff|=%.4f  max|diff|=%.4f  rms|diff|=%.4f  [nm]\n",
            res.mean_err, res.max_err, res.rms_err);
     return res;
 }
@@ -294,7 +297,8 @@ int main(int argc, char** argv)
     const float COEFF_C    = get_arg_float(argc,argv,"--coeff_c",  0.1f);
     const int   GP_ITERS   = get_arg_int  (argc,argv,"--gp_iters", 10);
 
-    const int   KW         = 2*(int)(SRSRK_C_W*SIGMA/DX)+1;
+    const float DX_NM      = get_arg_float(argc,argv,"--dx",        10.0f);
+    const int   KW         = 2*(int)(SRSRK_C_W*SIGMA/DX_PX)+1;
     const int   EROSION    = (KW-1)/2;
     const int   W          = N - 2*EROSION;
 
@@ -304,8 +308,8 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    printf("sigma=%.1f  KW=%d  erosion=%d  N=%d  W=%d  B=%d\n",
-           SIGMA, KW, EROSION, N, W, B);
+    printf("sigma=%.1f px  KW=%d  erosion=%d  N=%d  W=%d  B=%d  dx=%.1f nm/px\n",
+           SIGMA, KW, EROSION, N, W, B, DX_NM);
     printf("LNS: sigma_px=%.1f  period_px=%.1f (0=auto)  coeff_c=%.3f\n\n",
            LNS_SIG, LNS_PERIOD, COEFF_C);
 
@@ -314,7 +318,7 @@ int main(int argc, char** argv)
 
     // ── Build frequency-domain kernels ────────────────────────────────────
     std::vector<float> h_Kx, h_Ky;
-    make_kernel(h_Kx, h_Ky, KW, DX, SIGMA);
+    make_kernel(h_Kx, h_Ky, KW, DX_PX, SIGMA);
 
     const int FREQ_N = N*(N/2+1);
     cufftComplex *d_Gx_freq=nullptr, *d_Gy_freq=nullptr;
@@ -325,7 +329,7 @@ int main(int argc, char** argv)
 
     // ── Populate global context ───────────────────────────────────────────
     g_ctx.N=N; g_ctx.W=W; g_ctx.EROSION=EROSION; g_ctx.B=B;
-    g_ctx.dx=DX; g_ctx.stream=stream;
+    g_ctx.dx=DX_PX; g_ctx.stream=stream;
     g_ctx.d_Gx_freq=d_Gx_freq; g_ctx.d_Gy_freq=d_Gy_freq;
 
     cudaMalloc(&g_ctx.d_R_ref,  sizeof(float)*(size_t)B*W*W);
@@ -401,7 +405,7 @@ int main(int argc, char** argv)
         upload_patterns(d_E, imgs, N, stream);
         run_cd_sweep(d_E, g_ctx.d_R_ref, g_ctx.d_R_test,
                      d_E_crop, d_shrink, d_sig_ref, d_sig_test,
-                     B, N, W, EROSION, COEFF_C, /*center_row=*/true,
+                     B, N, W, EROSION, COEFF_C, DX_NM, /*center_row=*/true,
                      "LNS_VERTICAL — center-row CD  [signal = E + c·R]",
                      stream, "dump_cd/lns_vert", DUMP_MAX);
     }
@@ -412,7 +416,7 @@ int main(int argc, char** argv)
         upload_patterns(d_E, imgs, N, stream);
         run_cd_sweep(d_E, g_ctx.d_R_ref, g_ctx.d_R_test,
                      d_E_crop, d_shrink, d_sig_ref, d_sig_test,
-                     B, N, W, EROSION, COEFF_C, /*center_row=*/false,
+                     B, N, W, EROSION, COEFF_C, DX_NM, /*center_row=*/false,
                      "LNS_HORIZONTAL — center-col CD  [signal = E + c·R]",
                      stream, "dump_cd/lns_horiz", DUMP_MAX);
     }
