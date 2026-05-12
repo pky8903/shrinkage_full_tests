@@ -26,6 +26,7 @@ B=30              # number of patterns per CD sweep
 LNS_SIG=8.0       # LNS edge sigma (pixels)
 LNS_PERIOD=0.0    # LNS period (0 = auto: one full cycle across W)
 COEFF_C=1.0       # shrinkage coefficient c  (signal = E + c·R)
+DX=10.0           # physical pixel pitch (nm); used to report CD in nm
 GP_ITERS=10       # GP random iterations for Section A
 DUMP_MAX=4        # number of batches to dump as images (0 = no dump)
 
@@ -44,5 +45,6 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
     --lns_sig    "$LNS_SIG"    \
     --lns_period "$LNS_PERIOD" \
     --coeff_c    "$COEFF_C"    \
+    --dx         "$DX"         \
     --gp_iters   "$GP_ITERS"   \
     --dump_max   "$DUMP_MAX"
