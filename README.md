@@ -4,7 +4,7 @@ The table below lists the functions a developer must accelerate, the parameter r
 
 | Function | Image size (N×N) | Filter width KW = 2·erosion+1 | Batch B | Test binary |
 |---|---|---|---|---|
-| `srkTrainingForward` | 256, 512 | 31 – 121 | 1 000 – 5 000 | `compare_demo` |
+| `srkTrainingForward` | 256, 512 | 31 – 121 | 1 000 – 5 000 | `compare_demo`, `cd_training_test` |
 | `adjointSRK` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_adjoint_test` |
 | `shrinkageTangentOaS` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_tan_tanadj_test` |
 | `shrinkageTangentAdjointOaS` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_tan_tanadj_test` |
@@ -13,6 +13,27 @@ The table below lists the functions a developer must accelerate, the parameter r
 - `erosion = (KW − 1) / 2`  (e.g. KW=121 → erosion=60)
 - `output size W = N − 2·erosion`
 - `erosion = (input size − output size) / 2`
+
+## How to plug in your accelerated `srkTrainingForward`
+
+`cd_training_test` (`training/main_cd_training.cu`) is the entry point for CD-accuracy validation.
+
+1. Open `training/main_cd_training.cu` and locate `op_test()`.
+2. Replace the placeholder body with your accelerated implementation. The function contract is documented in the comment block inside `op_test()`:
+   - Input  `d_E`  : `[B × N × N]` col-major float32, device pointer (E = I = same array)
+   - Output `d_R`  : `[B × W × W]` col-major float32, device pointer
+   - Parameters `N`, `W`, `EROSION`, `dx`, `B`, stream, and pre-computed kernel freq buffers are all available via `g_ctx`.
+3. Rebuild and run:
+   ```bash
+   bash build.sh
+   ./build/cd_training_test --sigma 20.0 --N 256 --B 30 --coeff_c 0.1
+   ```
+4. The binary runs three sections:
+   - **Section A** — Pixel-level accuracy vs reference (GP random inputs, 10 iterations).
+   - **Section B** — CD sweep on LNS vertical patterns; measures `CD(E + c·R)`.
+   - **Section C** — CD sweep on LNS horizontal patterns; measures `CD(E + c·R)`.
+
+   A correct accelerated implementation should produce `max|diff| = 0` in Sections A–C (float32 bit-exact) or sub-0.001 px CD error if the implementation uses a different but equivalent algorithm.
 
 ---
 
