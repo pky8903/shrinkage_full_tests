@@ -1,3 +1,21 @@
+## Acceleration targets
+
+The table below lists the functions a developer must accelerate, the parameter ranges of interest, and the associated test binary.
+
+| Function | Image size (N×N) | Filter width KW = 2·erosion+1 | Batch B | Test binary |
+|---|---|---|---|---|
+| `srkTrainingForward` | 256, 512 | 31 – 121 | 1 000 – 5 000 | `compare_demo` |
+| `adjointSRK` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_adjoint_test` |
+| `shrinkageTangentOaS` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_tan_tanadj_test` |
+| `shrinkageTangentAdjointOaS` | 1k, 2k, 4k, 8k, 16k, 32k | 31 – 121 | 1 | `shrinkage_tan_tanadj_test` |
+
+**Derived parameters** (given KW):
+- `erosion = (KW − 1) / 2`  (e.g. KW=121 → erosion=60)
+- `output size W = N − 2·erosion`
+- `erosion = (input size − output size) / 2`
+
+---
+
 # shrinkage_full_tests
 
 Four CUDA test executables for the shrinkage operator `h = c·(conv(Gx,g)·∂f/∂x + conv(Gy,g)·∂f/∂y)`.
@@ -68,4 +86,4 @@ All spatial 2D buffers use **col-major layout** (`buf[col*H + row]`), consistent
 - `plot_adjoints.ipynb` — visualise adjoint test dumps
 - `plot_tan_tanadj.ipynb` — visualise tangent / tangent-adjoint dumps
 - `plot_batch_demo.ipynb` — visualise batch demo outputs
-# shrinkage_full_tests
+- `plot_compare_demo.ipynb` — signal + performance comparison: FFT vs Strip cuDNN

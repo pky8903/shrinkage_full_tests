@@ -1,0 +1,6 @@
+build/
+dump/
+dump_batch/
+dump_compare/
+.claude/
+.codex/
