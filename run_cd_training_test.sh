@@ -25,7 +25,7 @@ N=256             # padded input image size (N × N)
 B=30              # number of patterns per CD sweep
 LNS_SIG=8.0       # LNS edge sigma (pixels)
 LNS_PERIOD=0.0    # LNS period (0 = auto: one full cycle across W)
-COEFF_C=0.1       # shrinkage coefficient c  (signal = E + c·R)
+COEFF_C=1.0       # shrinkage coefficient c  (signal = E + c·R)
 GP_ITERS=10       # GP random iterations for Section A
 DUMP_MAX=4        # number of batches to dump as images (0 = no dump)
 
