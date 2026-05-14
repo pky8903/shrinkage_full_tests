@@ -221,7 +221,7 @@ __global__ void srk_adj_store_atomic(
     int gy = (int)(tile_stride * tid_y) + sy;
 
     if (gx >= 0 && gx < N_large && gy >= 0 && gy < N_large)
-        atomicAdd(&dLdE[gx * N_large + gy], val);   // col-major
+        dLdE[gx * N_large + gy] += val;   // col-major
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -270,8 +270,8 @@ void srk_fft_rows_c2r_valid(
                     unsigned int W         = total_input_size - 2 * erosion;
                     unsigned int out_index = out_x * W + out_y;   // col-major: col*H+row
 
-                    atomicAdd(&output[out_index],
-                              reinterpret_cast<const real_type*>(thread_data)[i]);
+                    output[out_index] =
+                              reinterpret_cast<const real_type*>(thread_data)[i];
                 }
             }
             index += stride;
